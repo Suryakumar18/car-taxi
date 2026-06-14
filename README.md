@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nagma Tours&Travels — Drop Taxi Website
 
-## Getting Started
+Animated cab-booking website built with **Next.js 16 + Tailwind CSS v4 + Framer Motion + MongoDB + Cloudinary** — a single Next.js application (one port, no separate server). Bookings open **WhatsApp** with the trip details pre-filled; the team calls the customer back and collects payment manually.
 
-First, run the development server:
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 — site. http://localhost:3000/admin — admin panel.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment (.env.local — never committed)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Purpose |
+|---|---|
+| `TAXI_MONGODB_URI` | MongoDB Atlas connection string (named with TAXI_ prefix because this machine has an unrelated global `MONGODB_URI`) |
+| `MONGODB_DB` | Database name (`nagma_taxi`) |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Image hosting for car photos |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Admin panel login — **change the password!** |
+| `AUTH_SECRET` | Signs the admin session cookie |
 
-## Learn More
+## Admin panel (/admin)
 
-To learn more about Next.js, take a look at the following resources:
+Everything on the site is editable from the dashboard — saved in MongoDB, live immediately:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Business Info** — name, tagline, phone, WhatsApp number, email, regions
+- **Theme & Colours** — 9 colour presets (amber, orange, red, rose, emerald, teal, sky, blue, violet) + default light/dark mode for first-time visitors
+- **Vehicles & Tariff** — add/edit/remove vehicles, rates, bata, tags, and **upload car images** (stored on Cloudinary)
+- **Popular Routes** — add/edit/remove route cards with km/time/fare
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+On first run the database auto-seeds with the default content.
 
-## Deploy on Vercel
+## How booking works
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Customer types pickup & drop address (plain text boxes), picks vehicle and date
+2. If the addresses contain known cities, live road distance + fare estimate is shown (OSRM routing, offline fallback)
+3. "Book on WhatsApp" opens WhatsApp with the full booking message → you call back and confirm
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Floating **Call** and **WhatsApp** buttons stay on the right edge of every screen.
+
+## Notes
+
+- Default car images were sourced from Wikimedia Commons (CC licenses) and background-removed; they live in your Cloudinary account under `taxi-website/cars`. Replace them anytime from the admin panel.
+- The DB connection uses a non-SRV connection string because this machine's DNS blocks SRV lookups. The standard `mongodb+srv://...` string also works when deployed (e.g. on Vercel) — both are fine.
+- Deploying to Vercel: import the repo, add the same env variables in Project Settings → Environment Variables.
