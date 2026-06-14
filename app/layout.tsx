@@ -17,11 +17,16 @@ const sora = Sora({
   subsets: ["latin"],
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://droptaxi.live";
+// Guard against env var set to literal string "undefined" or missing protocol
+const _rawUrl = process.env.NEXT_PUBLIC_SITE_URL;
+const SITE_URL =
+  _rawUrl && _rawUrl !== "undefined" && _rawUrl.startsWith("http")
+    ? _rawUrl
+    : "https://droptaxi.live";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { site, hero } = await getSiteData();
-  const ogImage = hero.heroImage || `${SITE_URL}/og-default.jpg`;
+  const ogImage = hero?.heroImage || `${SITE_URL}/og-default.jpg`;
 
   return {
     metadataBase: new URL(SITE_URL),
@@ -200,52 +205,57 @@ export default async function RootLayout({
 
   const { site, hero, faq } = data;
 
-  const localBusinessLd = {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": ["LocalBusiness", "TaxiService"],
-        "@id": `${SITE_URL}/#business`,
-        name: site.name,
-        description: `One way drop taxi service across Tamil Nadu, Kerala and Karnataka. Fixed fare from ₹14/km, no return charge, 24/7 booking.`,
-        telephone: site.phone,
-        email: site.email,
-        url: SITE_URL,
-        priceRange: "₹14–₹26/km",
-        currenciesAccepted: "INR",
-        paymentAccepted: "Cash, UPI",
-        openingHours: "Mo-Su 00:00-24:00",
-        image: hero.heroImage || `${SITE_URL}/og-default.jpg`,
-        areaServed: [
-          { "@type": "State", name: "Tamil Nadu" },
-          { "@type": "State", name: "Kerala" },
-          { "@type": "State", name: "Karnataka" },
-          { "@type": "AdministrativeArea", name: "Pondicherry" },
-        ],
-        address: { "@type": "PostalAddress", addressRegion: "Tamil Nadu", addressCountry: "IN" },
-        serviceType: ["One Way Taxi", "Round Trip Taxi", "Airport Transfer", "Outstation Cab", "Hill Station Tour"],
-        hasOfferCatalog: {
-          "@type": "OfferCatalog",
-          name: "Taxi Services",
-          itemListElement: [
-            { "@type": "Offer", itemOffered: { "@type": "Service", name: "One Way Drop Taxi" }, description: "Fixed fare one way drop taxi from ₹14/km. No return charge." },
-            { "@type": "Offer", itemOffered: { "@type": "Service", name: "Round Trip Taxi" }, description: "Round trip taxi from ₹13/km with per-day driver bata." },
-            { "@type": "Offer", itemOffered: { "@type": "Service", name: "Airport Transfer" }, description: "Airport pickup and drop with flight tracking." },
-            { "@type": "Offer", itemOffered: { "@type": "Service", name: "Outstation Cab" }, description: "Long distance outstation cab across South India." },
+  let ldJson = "{}";
+  try {
+    ldJson = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": ["LocalBusiness", "TaxiService"],
+          "@id": `${SITE_URL}/#business`,
+          name: site?.name || "Taxi Service",
+          description: "One way drop taxi service across Tamil Nadu, Kerala and Karnataka. Fixed fare from ₹14/km, no return charge, 24/7 booking.",
+          telephone: site?.phone,
+          email: site?.email,
+          url: SITE_URL,
+          priceRange: "₹14–₹26/km",
+          currenciesAccepted: "INR",
+          paymentAccepted: "Cash, UPI",
+          openingHours: "Mo-Su 00:00-24:00",
+          image: hero?.heroImage || `${SITE_URL}/og-default.jpg`,
+          areaServed: [
+            { "@type": "State", name: "Tamil Nadu" },
+            { "@type": "State", name: "Kerala" },
+            { "@type": "State", name: "Karnataka" },
+            { "@type": "AdministrativeArea", name: "Pondicherry" },
           ],
+          address: { "@type": "PostalAddress", addressRegion: "Tamil Nadu", addressCountry: "IN" },
+          serviceType: ["One Way Taxi", "Round Trip Taxi", "Airport Transfer", "Outstation Cab", "Hill Station Tour"],
+          hasOfferCatalog: {
+            "@type": "OfferCatalog",
+            name: "Taxi Services",
+            itemListElement: [
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "One Way Drop Taxi" }, description: "Fixed fare one way drop taxi from ₹14/km. No return charge." },
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "Round Trip Taxi" }, description: "Round trip taxi from ₹13/km with per-day driver bata." },
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "Airport Transfer" }, description: "Airport pickup and drop with flight tracking." },
+              { "@type": "Offer", itemOffered: { "@type": "Service", name: "Outstation Cab" }, description: "Long distance outstation cab across South India." },
+            ],
+          },
+          sameAs: site?.whatsappNumber ? [`https://wa.me/${site.whatsappNumber}`] : [],
         },
-        sameAs: [`https://wa.me/${site.whatsappNumber}`],
-      },
-      {
-        "@type": "FAQPage",
-        mainEntity: (faq?.items || []).map((item) => ({
-          "@type": "Question",
-          name: item.q,
-          acceptedAnswer: { "@type": "Answer", text: item.a },
-        })),
-      },
-    ],
-  };
+        {
+          "@type": "FAQPage",
+          mainEntity: (faq?.items || []).map((item) => ({
+            "@type": "Question",
+            name: item.q,
+            acceptedAnswer: { "@type": "Answer", text: item.a },
+          })),
+        },
+      ],
+    });
+  } catch {
+    // JSON-LD build failed — skip structured data, don't crash the page
+  }
 
   return (
     <html
@@ -270,10 +280,9 @@ export default async function RootLayout({
     >
       <head />
       <body className="min-h-full flex flex-col">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessLd) }}
-        />
+        {ldJson !== "{}" && (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson }} />
+        )}
         <Script
           id="theme-init"
           strategy="beforeInteractive"
