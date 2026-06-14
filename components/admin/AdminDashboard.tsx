@@ -311,17 +311,107 @@ function Card({ title, desc, children }: { title: string; desc?: string; childre
 
 function SiteTab({ data, setData }: P) {
   const set = (key: keyof SiteData["site"]) => (e: React.ChangeEvent<HTMLInputElement>) => setData({ ...data, site: { ...data.site, [key]: e.target.value } });
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadLogo(file: File) {
+    setLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.url) { alert(json.error || "Upload failed"); return; }
+      const newData = { ...data, site: { ...data.site, logoUrl: json.url } };
+      setData(newData);
+      await fetch("/api/admin/site", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newData) });
+    } catch { alert("Logo upload failed. Try again."); }
+    finally { setLogoUploading(false); if (logoInputRef.current) logoInputRef.current.value = ""; }
+  }
+
   return (
-    <Card title="Business Information" desc="Name, contact details, coverage — shown across the site.">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div><label className={lbl}>Business Name</label><input className={inp} value={data.site.name} onChange={set("name")} /></div>
-        <div><label className={lbl}>Tagline</label><input className={inp} value={data.site.tagline} onChange={set("tagline")} /></div>
-        <div><label className={lbl}>Phone (display)</label><input className={inp} value={data.site.phone} onChange={set("phone")} /></div>
-        <div><label className={lbl}>WhatsApp Number</label><input className={inp} value={data.site.whatsappNumber} onChange={set("whatsappNumber")} /></div>
-        <div><label className={lbl}>Email</label><input className={inp} value={data.site.email} onChange={set("email")} /></div>
-        <div><label className={lbl}>Service Regions</label><input className={inp} value={data.site.regions} onChange={set("regions")} /></div>
-      </div>
-    </Card>
+    <div className="space-y-5">
+      {/* Logo */}
+      <Card title="Brand Logo" desc="Shown in the navbar. Transparent PNG recommended.">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            {/* Preview at actual rendered size */}
+            <div className="flex h-16 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/5">
+              {data.site.logoUrl ? (
+                <img
+                  src={data.site.logoUrl}
+                  alt="Logo"
+                  className="w-auto object-contain"
+                  style={{ height: `${data.site.logoSize ?? 40}px` }}
+                />
+              ) : (
+                <span className="text-[10px] text-slate-400">No logo</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold transition hover:border-brand-500 hover:text-brand-600 dark:border-white/10 ${logoUploading ? "pointer-events-none opacity-60" : ""}`}>
+                {logoUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                {logoUploading ? "Uploading…" : data.site.logoUrl ? "Replace Logo" : "Upload Logo"}
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
+              </label>
+              {data.site.logoUrl && (
+                <button
+                  onClick={() => setData({ ...data, site: { ...data.site, logoUrl: "" } })}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-500/10"
+                >
+                  <Trash2 className="size-3.5" /> Remove Logo
+                </button>
+              )}
+              <p className="text-[10px] text-slate-400">PNG with transparent background works best</p>
+            </div>
+          </div>
+
+          {/* Size control */}
+          {data.site.logoUrl && (
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label className={lbl}>Logo Size in Navbar</label>
+                <span className="text-xs font-bold text-brand-600 dark:text-brand-400">{data.site.logoSize ?? 40}px</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setData({ ...data, site: { ...data.site, logoSize: Math.max(24, (data.site.logoSize ?? 40) - 4) } })}
+                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-sm font-bold transition hover:border-brand-500 hover:text-brand-600 dark:border-white/10"
+                >−</button>
+                <input
+                  type="range"
+                  min={24}
+                  max={80}
+                  step={4}
+                  value={data.site.logoSize ?? 40}
+                  onChange={(e) => setData({ ...data, site: { ...data.site, logoSize: Number(e.target.value) } })}
+                  className="flex-1 accent-brand-500"
+                />
+                <button
+                  onClick={() => setData({ ...data, site: { ...data.site, logoSize: Math.min(80, (data.site.logoSize ?? 40) + 4) } })}
+                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-sm font-bold transition hover:border-brand-500 hover:text-brand-600 dark:border-white/10"
+                >+</button>
+              </div>
+              <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                <span>24px (small)</span>
+                <span>80px (large)</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card title="Business Information" desc="Name, contact details, coverage — shown across the site.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div><label className={lbl}>Business Name</label><input className={inp} value={data.site.name} onChange={set("name")} /></div>
+          <div><label className={lbl}>Tagline</label><input className={inp} value={data.site.tagline} onChange={set("tagline")} /></div>
+          <div><label className={lbl}>Phone (display)</label><input className={inp} value={data.site.phone} onChange={set("phone")} /></div>
+          <div><label className={lbl}>WhatsApp Number</label><input className={inp} value={data.site.whatsappNumber} onChange={set("whatsappNumber")} /></div>
+          <div><label className={lbl}>Email</label><input className={inp} value={data.site.email} onChange={set("email")} /></div>
+          <div><label className={lbl}>Service Regions</label><input className={inp} value={data.site.regions} onChange={set("regions")} /></div>
+        </div>
+      </Card>
+    </div>
   );
 }
 

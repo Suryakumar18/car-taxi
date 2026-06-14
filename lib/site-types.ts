@@ -7,6 +7,8 @@ export type SiteInfo = {
   whatsappNumber: string;
   email: string;
   regions: string;
+  logoUrl?: string;
+  logoSize?: number;
 };
 
 export type NavLink = { label: string; href: string };
