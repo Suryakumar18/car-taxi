@@ -238,7 +238,7 @@ export default async function RootLayout({
       },
       {
         "@type": "FAQPage",
-        mainEntity: faq.items.map((item) => ({
+        mainEntity: (faq?.items || []).map((item) => ({
           "@type": "Question",
           name: item.q,
           acceptedAnswer: { "@type": "Answer", text: item.a },
@@ -268,13 +268,12 @@ export default async function RootLayout({
       }
       suppressHydrationWarning
     >
-      <head>
+      <head />
+      <body className="min-h-full flex flex-col">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessLd) }}
         />
-      </head>
-      <body className="min-h-full flex flex-col">
         <Script
           id="theme-init"
           strategy="beforeInteractive"
