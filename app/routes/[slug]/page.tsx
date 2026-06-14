@@ -21,10 +21,35 @@ export async function generateMetadata({
   const data = await getSiteData();
   const route = data.routes.find((r) => routeSlug(r.from, r.to) === slug);
   if (!route) return {};
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://droptaxi.live";
   const minRate = Math.min(...data.vehicles.map((v) => v.oneWayRate));
+  const maxRate = Math.max(...data.vehicles.map((v) => v.oneWayRate));
+  const pageUrl = `${siteUrl}/routes/${slug}`;
+  const title = `${route.from} to ${route.to} Taxi | ₹${minRate}/km Fixed Fare | One Way Drop`;
+  const desc = `Book ${route.from} to ${route.to} one way drop taxi. Fixed fare ₹${minRate}–₹${maxRate}/km, no return charge, no hidden costs. ${route.km} km journey (~${route.time}). Call or WhatsApp ${data.site.phone} — 24/7 booking.`;
   return {
-    title: `${route.from} to ${route.to} One Way Taxi | ₹${minRate}/km | ${data.site.name}`,
-    description: `Book ${route.from} to ${route.to} one way drop taxi at ₹${minRate}/km. Fixed fare, no return charges. ${route.km} km, ${route.time} journey. Call or WhatsApp ${data.site.phone} for instant booking.`,
+    title,
+    description: desc,
+    keywords: [
+      `${route.from} to ${route.to} taxi`,
+      `${route.from} to ${route.to} cab`,
+      `${route.from} to ${route.to} one way taxi`,
+      `${route.from} to ${route.to} drop taxi`,
+      `${route.from} to ${route.to} taxi fare`,
+      `${route.from} ${route.to} outstation cab`,
+      `${route.from} one way taxi`,
+      `${route.to} one way taxi`,
+      "one way drop taxi Tamil Nadu",
+      "fixed fare taxi",
+    ],
+    alternates: { canonical: pageUrl },
+    openGraph: {
+      title,
+      description: desc,
+      url: pageUrl,
+      images: [{ url: data.hero.heroImage || `${siteUrl}/og-default.jpg`, width: 1200, height: 630 }],
+    },
+    twitter: { card: "summary_large_image", title, description: desc },
   };
 }
 

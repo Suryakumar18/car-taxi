@@ -6,10 +6,19 @@ import FloatingButtons from "@/components/FloatingButtons";
 import GalleryPage from "@/components/GalleryPage";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { site } = await getSiteData();
+  const { site, hero } = await getSiteData();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://droptaxi.live";
   return {
-    title: `Gallery — ${site.name}`,
-    description: `Browse photos of our fleet, trips, and happy customers. ${site.name} — reliable taxi service across ${site.regions}.`,
+    title: `Fleet Gallery — Taxi Cars & Trips`,
+    description: `See our well-maintained taxi fleet — Sedan, SUV, Innova, Crysta & HyCross. Photos from real trips across Tamil Nadu, Kerala & Karnataka. ${site.name} — clean cars, verified drivers.`,
+    keywords: ["taxi fleet photos", "outstation cab gallery", "taxi cars Tamil Nadu", "Innova taxi Tamil Nadu", "SUV taxi Tamil Nadu"],
+    alternates: { canonical: `${siteUrl}/gallery` },
+    openGraph: {
+      title: `Fleet Gallery — ${site.name}`,
+      description: `Clean, well-maintained taxis — Sedan, SUV, Innova, Crysta & HyCross for outstation travel across Tamil Nadu.`,
+      url: `${siteUrl}/gallery`,
+      images: [{ url: hero.heroImage || `${siteUrl}/og-default.jpg`, width: 1200, height: 630 }],
+    },
   };
 }
 
