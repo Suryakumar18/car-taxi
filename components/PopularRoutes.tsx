@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { MoveRight, Clock3, Gauge, MessageCircle, Snowflake, Wind, Check } from "lucide-react";
+import { MoveRight, Clock3, Gauge, Snowflake, Wind, Check } from "lucide-react";
 import Reveal from "./Reveal";
 import Shimmer from "./Shimmer";
 import { useSite } from "./SiteProvider";
 import { estimateFare } from "@/lib/config";
 
+function routeSlug(from: string, to: string) {
+  return `${from}-to-${to}`.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
 type AcMode = "AC" | "Non-AC";
 
 export default function PopularRoutes() {
-  const { site, routes, routesHead, vehicles, wa } = useSite();
+  const { routes, routesHead, vehicles, wa, site } = useSite();
   const [selectedVehicle, setSelectedVehicle] = useState<string>(vehicles[0]?.name ?? "");
   const [acMode, setAcMode] = useState<AcMode>("AC");
 
@@ -103,13 +108,9 @@ export default function PopularRoutes() {
             const fare = vehicle
               ? estimateFare(vehicle, "One Way", r.km, undefined, acMode).total
               : r.fare;
-            const msg = `Hi ${site.name}! 🚖 I want to book *${r.from} → ${r.to}* in a ${vehicle?.name ?? "vehicle"} (${acMode}) — ${r.km} km, est. ₹${fare.toLocaleString("en-IN")}. Please confirm.`;
             return (
-              <motion.a
+              <motion.div
                 key={`${r.from}-${r.to}-${i}`}
-                href={wa(msg)}
-                target="_blank"
-                rel="noopener noreferrer"
                 initial={{ opacity: 0, y: 26 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-40px" }}
@@ -145,11 +146,14 @@ export default function PopularRoutes() {
                       ₹{fare.toLocaleString("en-IN")}
                     </p>
                   </div>
-                  <span className="flex items-center gap-1.5 rounded-full bg-green-500/15 px-3 py-1.5 text-[11px] font-bold text-green-700 transition group-hover:bg-green-500 group-hover:text-white sm:px-3.5 sm:py-2 sm:text-xs dark:text-green-400">
-                    <MessageCircle className="size-3.5" /> Book Now
-                  </span>
+                  <Link
+                    href={`/routes/${routeSlug(r.from, r.to)}`}
+                    className="flex items-center gap-1.5 rounded-full bg-brand-400/15 px-3 py-1.5 text-[11px] font-bold text-brand-700 transition group-hover:bg-brand-500 group-hover:text-white sm:px-3.5 sm:py-2 sm:text-xs dark:text-brand-300"
+                  >
+                    Check Fare
+                  </Link>
                 </div>
-              </motion.a>
+              </motion.div>
             );
           })}
         </div>

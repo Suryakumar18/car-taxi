@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Sora } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { getSiteData, THEME_PRESETS } from "@/lib/site-data";
 import { SiteProvider } from "@/components/SiteProvider";
@@ -66,14 +67,15 @@ export default async function RootLayout({
       }
       suppressHydrationWarning
     >
-      <head>
-        <script
+      <head />
+      <body className="min-h-full flex flex-col">
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':${defaultDark};document.documentElement.classList.toggle('dark',d)}catch(e){document.documentElement.classList.toggle('dark',${defaultDark})}})();`,
           }}
         />
-      </head>
-      <body className="min-h-full flex flex-col">
         <SiteProvider data={data}>{children}</SiteProvider>
       </body>
     </html>

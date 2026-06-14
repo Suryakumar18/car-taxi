@@ -7,15 +7,14 @@ try {
   dns.setServers(["8.8.8.8", "1.1.1.1"]);
 } catch {}
 
-// TAXI_-prefixed to avoid clashing with a global MONGODB_URI env var on this machine
-const uri = process.env.TAXI_MONGODB_URI;
-const dbName = process.env.MONGODB_DB || "nagma_taxi";
+const uri =
+  "mongodb://nagmatoursandtravels124_db_user:SiYxbd9pkywjtvIj@ac-ysxxm5j-shard-00-00.xxhiaqh.mongodb.net:27017,ac-ysxxm5j-shard-00-01.xxhiaqh.mongodb.net:27017,ac-ysxxm5j-shard-00-02.xxhiaqh.mongodb.net:27017/?tls=true&authSource=admin&replicaSet=atlas-13mlpn-shard-0&appName=Cluster0";
+const dbName = "nagma_taxi";
 
 // cache the client across hot reloads / route invocations
 const globalForMongo = globalThis as unknown as { _mongoClient?: Promise<MongoClient> };
 
 export async function getDb(): Promise<Db> {
-  if (!uri) throw new Error("MONGODB_URI is not set in .env.local");
   if (!globalForMongo._mongoClient) {
     globalForMongo._mongoClient = new MongoClient(uri, {
       serverSelectionTimeoutMS: 8000,

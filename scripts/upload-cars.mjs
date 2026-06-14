@@ -1,19 +1,13 @@
 // One-off: uploads public/cars/*.png to Cloudinary and prints the URLs.
 // Usage: node scripts/upload-cars.mjs
 import { v2 as cloudinary } from "cloudinary";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import path from "node:path";
 
-// load .env.local manually (no dotenv dependency)
-for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
-  const m = line.match(/^([A-Z_]+)=(.*)$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
-}
-
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: "dgzvoqywg",
+  api_key: "412541245868516",
+  api_secret: "z8TwRII3582KQzECFFqXKieKiFg",
 });
 
 const dir = path.join("public", "cars");

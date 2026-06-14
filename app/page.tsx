@@ -1,9 +1,9 @@
 import Navbar from "@/components/Navbar";
+import NavTicker from "@/components/NavTicker";
 import Hero from "@/components/Hero";
 import CityMarquee from "@/components/CityMarquee";
 import Stats from "@/components/Stats";
-import Tariff from "@/components/Tariff";
-import PopularRoutes from "@/components/PopularRoutes";
+import OneWayDestinations from "@/components/OneWayDestinations";
 import Services from "@/components/Services";
 import HowItWorks from "@/components/HowItWorks";
 import WhyUs from "@/components/WhyUs";
@@ -22,18 +22,18 @@ export default function Home() {
   return (
     <main>
       <Navbar />
+      <NavTicker />
       <Hero />
       <CityMarquee />
-      <Tariff />
+      <InfoStrip />
+      <ImportantInfo />
       <Stats />
-      <PopularRoutes />
+      <OneWayDestinations />
       <Services />
       <HowItWorks />
       <WhyUs />
       <TrustBadges />
       <CityServices />
-      <InfoStrip />
-      <ImportantInfo />
       <Testimonials />
       <Faq />
       <CtaBanner />

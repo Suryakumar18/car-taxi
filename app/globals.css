@@ -47,14 +47,14 @@ body {
 
 /* ── glass card (theme aware) ── */
 .glass {
-  background: rgba(255, 255, 255, 0.72);
+  background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.09);
-  backdrop-filter: blur(14px);
   box-shadow: 0 6px 24px -12px rgba(15, 23, 42, 0.12);
 }
 .dark .glass {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
   box-shadow: none;
 }
 
@@ -69,6 +69,9 @@ body {
 }
 .animate-marquee {
   animation: marquee 28s linear infinite;
+}
+.animate-marquee-ticker {
+  animation: marquee 45s linear infinite;
 }
 
 /* ── floating blob ── */

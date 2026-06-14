@@ -98,26 +98,24 @@ export default function Hero() {
   const hasImage = !!hero.heroImage;
 
   return (
-    <section className={`relative isolate overflow-hidden ${hasImage ? "text-white" : ""}`}>
-      {/* ── Background effects ── */}
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        {/* Hero background image */}
+    <section className={`relative isolate ${hasImage ? "text-white" : ""}`}>
+      {/* ── Background ── */}
+      {/* "screen": fills viewport height (cover). "content": shows full image at top, section height driven by content. */}
+      <div className={`pointer-events-none absolute -z-10 overflow-hidden ${hero.heroImageFit === "content" ? "inset-0" : "inset-x-0 top-0 h-screen"}`}>
         {hero.heroImage ? (
           <>
             <img
               src={hero.heroImage}
               alt=""
-              className="absolute inset-0 size-full object-cover"
+              fetchPriority="high"
+              className="h-full w-full object-cover object-center"
             />
             {/* Dark overlay for readability */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-[var(--page-bg)]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--page-bg)]" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/20" />
           </>
         ) : (
-          <>
-            {/* Car silhouette background (fallback) */}
-            <div className="hero-car-bg absolute inset-0 opacity-[0.035] dark:opacity-[0.04]" />
-          </>
+          <div className="hero-car-bg absolute inset-0 opacity-[0.035] dark:opacity-[0.04]" />
         )}
         {/* Gradient blobs */}
         <div className="animate-blob absolute -left-40 -top-20 size-[500px] rounded-full bg-brand-400/15 blur-[100px] dark:bg-brand-400/10" />
@@ -134,7 +132,7 @@ export default function Hero() {
       {/* ── Hero Content ── */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* Top section: Headline + Booking side by side on desktop */}
-        <div className="grid items-start gap-8 pt-24 sm:pt-32 lg:grid-cols-[1.1fr_1fr] lg:gap-12 xl:gap-16">
+        <div className="grid items-start gap-8 pt-28 sm:pt-36 lg:grid-cols-[1fr_1.2fr] lg:gap-10 xl:gap-12">
           {/* Left: Copy */}
           <div className="pt-2 lg:pt-8">
             <motion.div

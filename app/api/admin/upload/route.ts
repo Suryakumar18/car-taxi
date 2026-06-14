@@ -2,9 +2,9 @@ import { v2 as cloudinary } from "cloudinary";
 import { isAdminRequest } from "@/lib/auth";
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: "dgzvoqywg",
+  api_key: "412541245868516",
+  api_secret: "z8TwRII3582KQzECFFqXKieKiFg",
 });
 
 export async function POST(request: Request) {

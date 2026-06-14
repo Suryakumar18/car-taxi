@@ -12,7 +12,6 @@ import {
   Clock,
   User,
   Phone,
-  Car,
   MessageCircle,
   PhoneCall,
   ChevronDown,
@@ -29,18 +28,24 @@ type TripType = "One Way" | "Round Trip";
 type AcMode = "AC" | "Non-AC";
 type RouteInfo = { km: number; durationHrs?: number; real: boolean };
 
+const PICKUP_TIMES = Array.from({ length: 24 }, (_, i) => {
+  const hour = i % 12 || 12;
+  const period = i < 12 ? "AM" : "PM";
+  return `${hour}:00 ${period}`;
+});
+
 export default function BookingForm() {
   const { site, vehicles, phoneHref, wa } = useSite();
   const [trip, setTrip] = useState<TripType>("One Way");
   const [acMode, setAcMode] = useState<AcMode>("AC");
   const [form, setForm] = useState({
-    name: "",
-    phone: "",
     pickup: "",
     drop: "",
+    name: "",
+    phone: "",
     date: "",
-    returnDate: "",
     time: "",
+    returnDate: "",
     vehicle: vehicles[1]?.name ?? vehicles[0]?.name ?? "",
   });
   const [route, setRoute] = useState<RouteInfo | null>(null);
@@ -48,14 +53,14 @@ export default function BookingForm() {
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
-  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm({ ...form, [key]: e.target.value });
+  const set =
+    (key: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm({ ...form, [key]: e.target.value });
 
   const swap = () => setForm({ ...form, pickup: form.drop, drop: form.pickup });
 
   const vehicle = vehicles.find((v) => v.name === form.vehicle) ?? vehicles[0];
-
-  // estimate distance when the typed addresses contain known cities
   const pickupLoc = useMemo(() => matchLocation(form.pickup), [form.pickup]);
   const dropLoc = useMemo(() => matchLocation(form.drop), [form.drop]);
 
@@ -65,15 +70,12 @@ export default function BookingForm() {
       setRouting(false);
       return;
     }
-
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setRouting(true);
-
     const timer = setTimeout(async () => {
       try {
-        // free OpenStreetMap routing — real driving distance & time
         const url = `https://router.project-osrm.org/route/v1/driving/${pickupLoc.lng},${pickupLoc.lat};${dropLoc.lng},${dropLoc.lat}?overview=false`;
         const res = await fetch(url, { signal: ctrl.signal });
         const json = await res.json();
@@ -89,7 +91,6 @@ export default function BookingForm() {
         if (!ctrl.signal.aborted) setRouting(false);
       }
     }, 500);
-
     return () => {
       clearTimeout(timer);
       ctrl.abort();
@@ -108,20 +109,18 @@ export default function BookingForm() {
       return;
     }
     setError("");
-
     const lines = [
       `🚖 *New Booking — ${site.name}*`,
       ``,
-      `👤 Name: ${form.name}`,
-      `📞 Phone: ${form.phone}`,
-      `🔁 Trip Type: ${trip}`,
-      `🚗 Vehicle: ${form.vehicle} (${acMode})`,
       `📍 Pickup: ${form.pickup}`,
       `🏁 Drop: ${form.drop}`,
+      `👤 Name: ${form.name}`,
+      `📞 Phone: ${form.phone}`,
       `📅 Travel Date: ${form.date}`,
     ];
-    if (trip === "Round Trip" && form.returnDate) lines.push(`📅 Return Date: ${form.returnDate}`);
     if (form.time) lines.push(`⏰ Pickup Time: ${form.time}`);
+    if (trip === "Round Trip" && form.returnDate) lines.push(`📅 Return Date: ${form.returnDate}`);
+    lines.push(`🔁 Trip Type: ${trip}`, `🚗 Vehicle: ${form.vehicle} (${acMode})`);
     if (estimate) {
       lines.push(
         `📏 Distance: ~${estimate.km} km${trip === "Round Trip" ? " each way" : ""} (${estimate.duration} drive)`,
@@ -129,13 +128,14 @@ export default function BookingForm() {
       );
     }
     lines.push(``, `Please confirm my booking. ✅`);
-
     window.open(wa(lines.join("\n")), "_blank");
   }
 
+  // Input base — labels are shown separately so no pl-11 offset needed
   const inputCls =
-    "w-full rounded-xl border border-slate-900/15 bg-white/80 px-4 py-3 pl-11 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-brand-500/70 focus:bg-white [color-scheme:light] dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-300 dark:focus:border-brand-400/70 dark:focus:bg-white/10 dark:[color-scheme:dark]";
-  const optionCls = "bg-white dark:bg-slate-900";
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pl-9 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-500/20 [color-scheme:light] dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-400 dark:focus:border-green-500/60 dark:[color-scheme:dark]";
+  const labelCls = "mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400";
+  const optCls = "bg-white dark:bg-slate-900";
 
   return (
     <motion.div
@@ -143,108 +143,218 @@ export default function BookingForm() {
       initial={{ opacity: 0, y: 40, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
-      className="glass relative w-full max-w-md scroll-mt-24 rounded-3xl p-5 shadow-2xl shadow-slate-900/10 sm:p-7 dark:shadow-black/40"
+      className="glass relative w-full max-w-xl scroll-mt-24 rounded-3xl p-4 shadow-2xl shadow-slate-900/10 sm:p-5 lg:max-w-2xl dark:shadow-black/40"
     >
-      <div className="absolute -top-3 right-6 rounded-full bg-brand-400 px-3 py-1 text-xs font-bold text-slate-950">
-        Instant WhatsApp Booking
-      </div>
-
-      <h3 className="font-display text-xl font-bold">Book Your Ride</h3>
-      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-        Type your pickup & drop address. Booking opens WhatsApp — we confirm by call. No online payment.
+      {/* Header */}
+      <h3 className="font-display text-lg font-bold sm:text-xl">Quick Taxi Booking</h3>
+      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+        One Way • Outstation • Airport Drop
       </p>
 
-      {/* trip type toggle */}
-      <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-900/5 p-1 sm:mt-5 dark:bg-white/5">
-        {(["One Way", "Round Trip"] as TripType[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTrip(t)}
-            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition ${
-              trip === t
-                ? "bg-brand-400 text-slate-950 shadow"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-            }`}
-          >
-            {t === "One Way" ? <ArrowRight className="size-4" /> : <ArrowRightLeft className="size-4" />}
-            {t}
-          </button>
-        ))}
-      </div>
+      <form onSubmit={handleSubmit} className="mt-3 space-y-3">
 
-      {/* AC / Non-AC toggle */}
-      <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-slate-900/5 p-1 dark:bg-white/5">
-        {(["AC", "Non-AC"] as AcMode[]).map((m) => {
-          const v = vehicles.find((vv) => vv.name === form.vehicle) ?? vehicles[0];
-          const rate = m === "AC"
-            ? (trip === "One Way" ? v?.oneWayRate : v?.roundRate)
-            : (trip === "One Way" ? (v?.nonAcOneWayRate ?? v?.oneWayRate) : (v?.nonAcRoundRate ?? v?.roundRate));
-          return (
+        {/* ── Row 1: Pickup + Drop ── */}
+        <div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>Pickup Address</label>
+              <div className="relative">
+                <MapPin className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-green-600 dark:text-green-500" />
+                <input
+                  className={inputCls}
+                  placeholder="Enter pickup location"
+                  value={form.pickup}
+                  onChange={set("pickup")}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Drop Address</label>
+              <div className="relative">
+                <Flag className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-green-600 dark:text-green-500" />
+                <input
+                  className={inputCls}
+                  placeholder="Enter drop location"
+                  value={form.drop}
+                  onChange={set("drop")}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="mt-1.5 flex justify-end">
             <button
-              key={m}
               type="button"
-              onClick={() => setAcMode(m)}
-              className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition ${
-                acMode === m
-                  ? "bg-brand-400 text-slate-950 shadow"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-              }`}
+              onClick={swap}
+              className="flex items-center gap-1 text-[11px] font-medium text-green-700 hover:text-green-600 dark:text-green-400"
             >
-              {m === "AC" ? <Snowflake className="size-3.5" /> : <Wind className="size-3.5" />}
-              {m} <span className="opacity-70">· ₹{rate}/km</span>
+              <ArrowUpDown className="size-3" />
+              Swap pickup &amp; drop
             </button>
-          );
-        })}
-      </div>
-
-      <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-        {/* pickup / drop address boxes with swap */}
-        <div className="relative space-y-3">
-          <div className="relative">
-            <MapPin className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-            <input
-              className={`${inputCls} pr-12`}
-              placeholder="Pickup Address (e.g. Anna Nagar, Chennai)"
-              value={form.pickup}
-              onChange={set("pickup")}
-            />
           </div>
-
-          <div className="relative">
-            <Flag className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-            <input
-              className={`${inputCls} pr-12`}
-              placeholder="Drop Address (e.g. Madurai)"
-              value={form.drop}
-              onChange={set("drop")}
-            />
-          </div>
-
-          {/* swap button */}
-          <button
-            type="button"
-            onClick={swap}
-            aria-label="Swap pickup and drop"
-            className="absolute right-3 top-1/2 z-10 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-brand-500/40 bg-white text-brand-600 shadow transition hover:rotate-180 active:scale-90 dark:border-brand-400/40 dark:bg-slate-900 dark:text-brand-400"
-          >
-            <ArrowUpDown className="size-4" />
-          </button>
         </div>
 
-        <div className="relative">
-          <Car className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-          <select className={`${inputCls} appearance-none pr-10`} value={form.vehicle} onChange={set("vehicle")} aria-label="Vehicle">
-            {vehicles.map((v) => (
-              <option key={v.name} value={v.name} className={optionCls}>
-                {v.name} — ₹{trip === "One Way" ? v.oneWayRate : v.roundRate}/km ({v.seats} seater)
-              </option>
+        {/* ── Row 2: Full Name + Mobile Number ── */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>Full Name</label>
+            <div className="relative">
+              <User className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-green-600 dark:text-green-500" />
+              <input className={inputCls} placeholder="Your name" value={form.name} onChange={set("name")} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Mobile Number</label>
+            <div className="relative">
+              <Phone className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-green-600 dark:text-green-500" />
+              <input className={inputCls} placeholder="10-digit mobile" type="tel" value={form.phone} onChange={set("phone")} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Row 3: Pickup Date + Pickup Time ── */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>Pickup Date</label>
+            <div className="relative">
+              <CalendarDays className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-green-600 dark:text-green-500" />
+              <input className={inputCls} type="date" value={form.date} onChange={set("date")} aria-label="Pickup date" />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Pickup Time</label>
+            <div className="relative">
+              <Clock className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-green-600 dark:text-green-500" />
+              <select
+                className={`${inputCls} appearance-none pr-10`}
+                value={form.time}
+                onChange={set("time")}
+                aria-label="Pickup time"
+              >
+                <option value="" className={optCls}>Select Time</option>
+                {PICKUP_TIMES.map((t) => (
+                  <option key={t} value={t} className={optCls}>{t}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Return date (Round Trip only) */}
+        {trip === "Round Trip" && (
+          <div>
+            <label className={labelCls}>Return Date</label>
+            <div className="relative">
+              <CalendarDays className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-green-600 dark:text-green-500" />
+              <input
+                className={inputCls}
+                type="date"
+                value={form.returnDate}
+                onChange={set("returnDate")}
+                aria-label="Return date"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Trip Type cards ── */}
+        <div>
+          <label className={labelCls}>Trip Type</label>
+          <div className="grid grid-cols-2 gap-3">
+            {(["One Way", "Round Trip"] as TripType[]).map((t) => {
+              const active = trip === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTrip(t)}
+                  className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-left transition ${
+                    active
+                      ? "border-green-500 bg-green-50 dark:border-green-500/70 dark:bg-green-900/20"
+                      : "border-slate-200 bg-white hover:border-green-300 dark:border-white/10 dark:bg-white/5 dark:hover:border-green-600/40"
+                  }`}
+                >
+                  {t === "One Way"
+                    ? <ArrowRight className="size-4 shrink-0 text-green-600" />
+                    : <ArrowRightLeft className="size-4 shrink-0 text-green-600" />}
+                  <div>
+                    <p className="text-[13px] font-bold text-slate-900 dark:text-white">{t}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t === "One Way" ? "Min 150 KM" : "Min 300 KM/Day"}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── AC / Non-AC toggle ── */}
+        <div>
+          <label className={labelCls}>AC / Non-AC</label>
+          <div className="grid grid-cols-2 gap-3">
+            {(["AC", "Non-AC"] as AcMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setAcMode(m)}
+                className={`flex items-center justify-center gap-1.5 rounded-lg border-2 py-2 text-[13px] font-semibold transition ${
+                  acMode === m
+                    ? "border-green-500 bg-green-50 text-green-700 dark:border-green-500/70 dark:bg-green-900/20 dark:text-green-400"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-green-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-green-600/40"
+                }`}
+              >
+                {m === "AC" ? <Snowflake className="size-4" /> : <Wind className="size-4" />}
+                {m}
+              </button>
             ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          </div>
         </div>
 
-        {/* live fare estimate */}
+        {/* ── Vehicle card grid ── */}
+        <div>
+          <label className={labelCls}>Select Vehicle</label>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-3">
+            {vehicles.map((v) => {
+              const rate = acMode === "AC"
+                ? (trip === "One Way" ? v.oneWayRate : v.roundRate)
+                : (trip === "One Way" ? (v.nonAcOneWayRate ?? v.oneWayRate) : (v.nonAcRoundRate ?? v.roundRate));
+              const selected = form.vehicle === v.name;
+              return (
+                <button
+                  key={v.name}
+                  type="button"
+                  onClick={() => setForm({ ...form, vehicle: v.name })}
+                  className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-1 py-1.5 text-center transition ${
+                    selected
+                      ? "border-green-500 bg-green-50 dark:border-green-500/70 dark:bg-green-900/20"
+                      : "border-slate-200 bg-white hover:border-green-300 dark:border-white/10 dark:bg-white/5 dark:hover:border-green-600/30"
+                  }`}
+                >
+                  {v.image ? (
+                    <img
+                      src={v.image}
+                      alt={v.name}
+                      width={80}
+                      height={48}
+                      className="h-11 w-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-11 w-full items-center justify-center">
+                      <span className="text-xl sm:text-2xl">🚗</span>
+                    </div>
+                  )}
+                  <p className={`text-[11px] font-bold ${selected ? "text-green-600 dark:text-green-400" : "text-green-700 dark:text-green-500"}`}>
+                    ₹{rate}<span className="text-[9px] font-normal">/km</span>
+                  </p>
+                  <p className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-700 dark:text-slate-300">
+                    {v.name}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Live fare estimate ── */}
         <AnimatePresence>
           {(routing || estimate) && (
             <motion.div
@@ -255,32 +365,32 @@ export default function BookingForm() {
               className="overflow-hidden"
             >
               {routing && !estimate ? (
-                <div className="flex items-center gap-2 rounded-xl border border-brand-500/40 bg-brand-400/10 p-3.5 text-xs font-semibold text-slate-600 dark:border-brand-400/30 dark:text-slate-400">
-                  <Loader2 className="size-4 animate-spin text-brand-600 dark:text-brand-400" />
-                  Calculating road distance & fare…
+                <div className="flex items-center gap-2 rounded-xl border border-green-500/40 bg-green-50 p-3.5 text-xs font-semibold text-slate-600 dark:border-green-500/20 dark:bg-green-900/10 dark:text-slate-400">
+                  <Loader2 className="size-4 animate-spin text-green-600 dark:text-green-400" />
+                  Calculating road distance &amp; fare…
                 </div>
               ) : estimate ? (
-                <div className="rounded-xl border border-brand-500/40 bg-brand-400/10 p-3.5 dark:border-brand-400/30">
+                <div className="rounded-xl border border-green-500/40 bg-green-50 p-4 dark:border-green-500/20 dark:bg-green-900/10">
                   <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <RouteIcon className="size-3.5 text-brand-600 dark:text-brand-400" />
+                      <RouteIcon className="size-3.5 text-green-600 dark:text-green-400" />
                       {route?.real ? "" : "≈ "}
                       {estimate.km} km{trip === "Round Trip" ? " each way" : ""} • {estimate.duration} drive
                     </span>
-                    <span className="uppercase tracking-wider text-brand-700 dark:text-brand-300">Estimated Fare</span>
+                    <span className="uppercase tracking-wider text-green-700 dark:text-green-400">Estimated Fare</span>
                   </div>
-                  <div className="mt-1 flex items-end justify-between gap-2">
+                  <div className="mt-1.5 flex items-end justify-between gap-2">
                     <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-400">
                       ₹{estimate.rate}/km × {estimate.billKm} km
                       <br />+ Driver bata ₹{estimate.bata.toLocaleString("en-IN")}
                       {trip === "Round Trip" && estimate.days > 1 ? ` (${estimate.days} days)` : ""}
                     </p>
-                    <p className="font-display flex items-center text-2xl font-extrabold text-brand-600 dark:text-brand-400">
+                    <p className="flex items-center text-2xl font-extrabold text-green-600 dark:text-green-400">
                       <IndianRupee className="size-5" />
                       {estimate.total.toLocaleString("en-IN")}
                     </p>
                   </div>
-                  <p className="mt-1.5 text-[10px] text-slate-500">
+                  <p className="mt-1.5 text-[10px] text-slate-500 dark:text-slate-400">
                     *{route?.real ? "Live road distance." : "Approximate distance."} Toll/parking extra. Final fare confirmed on call.
                   </p>
                 </div>
@@ -289,61 +399,29 @@ export default function BookingForm() {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="relative">
-            <User className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-            <input className={inputCls} placeholder="Your Name" value={form.name} onChange={set("name")} />
-          </div>
-          <div className="relative">
-            <Phone className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-            <input className={inputCls} placeholder="Mobile Number" type="tel" value={form.phone} onChange={set("phone")} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="relative">
-            <CalendarDays className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-            <input className={inputCls} type="date" value={form.date} onChange={set("date")} aria-label="Travel date" />
-          </div>
-          {trip === "Round Trip" ? (
-            <div className="relative">
-              <CalendarDays className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-              <input
-                className={inputCls}
-                type="date"
-                value={form.returnDate}
-                onChange={set("returnDate")}
-                aria-label="Return date"
-              />
-            </div>
-          ) : (
-            <div className="relative">
-              <Clock className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-brand-500 dark:text-brand-400/80" />
-              <input className={inputCls} type="time" value={form.time} onChange={set("time")} aria-label="Pickup time" />
-            </div>
-          )}
-        </div>
-
         {error && <p className="text-xs font-medium text-red-500 dark:text-red-400">{error}</p>}
 
+        {/* ── Send Booking ── */}
         <button
           type="submit"
-          className="group flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-sm font-bold text-white transition hover:bg-green-400 hover:shadow-lg hover:shadow-green-500/30 active:scale-[0.98]"
+          className="group flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 py-2.5 text-sm font-bold text-white transition hover:bg-green-400 hover:shadow-lg hover:shadow-green-500/30 active:scale-[0.98]"
         >
-          <MessageCircle className="size-5 transition group-hover:scale-110" />
-          {estimate ? `Book Now — ₹${estimate.total.toLocaleString("en-IN")}` : "Book on WhatsApp"}
+          <MessageCircle className="size-4 transition group-hover:scale-110" />
+          {estimate ? `Send Booking — ₹${estimate.total.toLocaleString("en-IN")}` : "Send Booking via WhatsApp"}
         </button>
 
-        <div className="flex items-center gap-3 text-[11px] text-slate-500">
-          <span className="h-px flex-1 bg-slate-900/10 dark:bg-white/10" /> or <span className="h-px flex-1 bg-slate-900/10 dark:bg-white/10" />
+        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+          <span className="h-px flex-1 bg-slate-900/10 dark:bg-white/10" />
+          or call directly
+          <span className="h-px flex-1 bg-slate-900/10 dark:bg-white/10" />
         </div>
 
         <a
           href={phoneHref}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-500/60 py-3 text-sm font-bold text-brand-700 transition hover:bg-brand-400/10 active:scale-[0.98] dark:border-brand-400/50 dark:text-brand-300"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-green-600/50 py-2 text-[13px] font-bold text-green-700 transition hover:bg-green-50 active:scale-[0.98] dark:border-green-500/40 dark:text-green-400 dark:hover:bg-green-900/20"
         >
           <PhoneCall className="size-4" />
-          Call to Book — {site.phone}
+          {site.phone}
         </a>
       </form>
     </motion.div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -9,11 +9,14 @@ import {
   ListOrdered, ShieldCheck, Star, HelpCircle, Megaphone, Globe, BadgeCheck,
   Info, ScrollText, Menu, X, ChevronRight, Navigation, LayoutGrid, ImageIcon,
   Gift, Wrench, Phone, MessageCircle, Settings, Map, Paintbrush,
+  ZoomIn, ZoomOut, Crop,
 } from "lucide-react";
+import EasyCropper from "react-easy-crop";
+import type { Area, Point } from "react-easy-crop";
 import type {
   SiteData, VehicleDoc, RouteDoc, StatItem, StepItem, ReviewItem, FaqItem,
   SectionHeading, ServiceCityItem, TravelTermsColumn, NavLink, FooterColumn,
-  ServiceItem, GalleryItem, TourPackage, ThemePreset,
+  ServiceItem, GalleryItem, TourPackage, ThemePreset, DestinationItem,
 } from "@/lib/site-types";
 import { THEME_PRESETS } from "@/lib/site-types";
 
@@ -21,7 +24,7 @@ type Tab =
   | "site" | "theme" | "customThemes" | "hero" | "stats" | "cities" | "vehicles" | "routes"
   | "how" | "why" | "reviews" | "faq" | "cta" | "cityServices" | "trustBadges"
   | "infoStrip" | "importantInfo" | "navbar" | "footer" | "services" | "gallery" | "offer"
-  | "tours";
+  | "tours" | "destinations";
 
 type TabGroup = { label: string; items: { key: Tab; label: string; icon: typeof Building2 }[] };
 
@@ -54,6 +57,7 @@ const TAB_GROUPS: TabGroup[] = [
       { key: "vehicles", label: "Vehicles & Tariff", icon: Car },
       { key: "routes", label: "Popular Routes", icon: RouteIcon },
       { key: "tours", label: "Tour Packages", icon: Map },
+      { key: "destinations", label: "One Way Destinations", icon: RouteIcon },
       { key: "cityServices", label: "City Services", icon: Globe },
     ],
   },
@@ -116,6 +120,9 @@ export default function AdminDashboard() {
           offer: { enabled: false, title: "", description: "", buttonText: "", buttonLink: "whatsapp", dismissLabel: "" },
           tours: { kicker: "", title: "", subtitle: "", items: [] },
           customThemes: [],
+          destinationsHead: { kicker: "", title: "" },
+          destinations: [],
+          destinationsColumns: 2 as 1 | 2,
         };
         setData({ ...defaults, ...d,
           hero: { ...defaults.hero, ...d.hero },
@@ -129,6 +136,9 @@ export default function AdminDashboard() {
           offer: { ...defaults.offer, ...d.offer },
           tours: { ...defaults.tours, ...d.tours, items: d.tours?.items ?? [] },
           customThemes: Array.isArray(d.customThemes) ? d.customThemes : [],
+          destinationsHead: { ...defaults.destinationsHead, ...d.destinationsHead },
+          destinations: Array.isArray(d.destinations) ? d.destinations : [],
+          destinationsColumns: (d.destinationsColumns as 1 | 2) ?? 2,
           importantInfo: {
             general: { ...defaults.importantInfo.general, ...d.importantInfo?.general },
             oneWay: { ...defaults.importantInfo.oneWay, ...d.importantInfo?.oneWay },
@@ -243,6 +253,7 @@ export default function AdminDashboard() {
             {tab === "vehicles" && <VehiclesTab data={data} setData={setData} />}
             {tab === "routes" && <RoutesTab data={data} setData={setData} />}
             {tab === "tours" && <ToursTab data={data} setData={setData} />}
+            {tab === "destinations" && <DestinationsTab data={data} setData={setData} />}
             {tab === "cityServices" && <CityServicesTab data={data} setData={setData} />}
             {tab === "how" && <StepsTab data={data} setData={setData} section="how" title="How It Works" noun="Step" />}
             {tab === "why" && <FeaturesTab data={data} setData={setData} />}
@@ -256,6 +267,30 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
+}
+
+/* ════════════════════ Image crop helpers ════════════════════ */
+
+function createImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    if (!url.startsWith("blob:")) img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+  ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Canvas is empty"))), "image/jpeg", 0.92);
+  });
 }
 
 /* ════════════════════ Shared helpers ════════════════════ */
@@ -284,17 +319,107 @@ function Card({ title, desc, children }: { title: string; desc?: string; childre
 
 function SiteTab({ data, setData }: P) {
   const set = (key: keyof SiteData["site"]) => (e: React.ChangeEvent<HTMLInputElement>) => setData({ ...data, site: { ...data.site, [key]: e.target.value } });
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadLogo(file: File) {
+    setLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.url) { alert(json.error || "Upload failed"); return; }
+      const newData = { ...data, site: { ...data.site, logoUrl: json.url } };
+      setData(newData);
+      await fetch("/api/admin/site", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newData) });
+    } catch { alert("Logo upload failed. Try again."); }
+    finally { setLogoUploading(false); if (logoInputRef.current) logoInputRef.current.value = ""; }
+  }
+
   return (
-    <Card title="Business Information" desc="Name, contact details, coverage — shown across the site.">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div><label className={lbl}>Business Name</label><input className={inp} value={data.site.name} onChange={set("name")} /></div>
-        <div><label className={lbl}>Tagline</label><input className={inp} value={data.site.tagline} onChange={set("tagline")} /></div>
-        <div><label className={lbl}>Phone (display)</label><input className={inp} value={data.site.phone} onChange={set("phone")} /></div>
-        <div><label className={lbl}>WhatsApp Number</label><input className={inp} value={data.site.whatsappNumber} onChange={set("whatsappNumber")} /></div>
-        <div><label className={lbl}>Email</label><input className={inp} value={data.site.email} onChange={set("email")} /></div>
-        <div><label className={lbl}>Service Regions</label><input className={inp} value={data.site.regions} onChange={set("regions")} /></div>
-      </div>
-    </Card>
+    <div className="space-y-5">
+      {/* Logo */}
+      <Card title="Brand Logo" desc="Shown in the navbar. Transparent PNG recommended.">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            {/* Preview at actual rendered size */}
+            <div className="flex h-16 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/5">
+              {data.site.logoUrl ? (
+                <img
+                  src={data.site.logoUrl}
+                  alt="Logo"
+                  className="w-auto object-contain"
+                  style={{ height: `${data.site.logoSize ?? 40}px` }}
+                />
+              ) : (
+                <span className="text-[10px] text-slate-400">No logo</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold transition hover:border-brand-500 hover:text-brand-600 dark:border-white/10 ${logoUploading ? "pointer-events-none opacity-60" : ""}`}>
+                {logoUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                {logoUploading ? "Uploading…" : data.site.logoUrl ? "Replace Logo" : "Upload Logo"}
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
+              </label>
+              {data.site.logoUrl && (
+                <button
+                  onClick={() => setData({ ...data, site: { ...data.site, logoUrl: "" } })}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-500/10"
+                >
+                  <Trash2 className="size-3.5" /> Remove Logo
+                </button>
+              )}
+              <p className="text-[10px] text-slate-400">PNG with transparent background works best</p>
+            </div>
+          </div>
+
+          {/* Size control */}
+          {data.site.logoUrl && (
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label className={lbl}>Logo Size in Navbar</label>
+                <span className="text-xs font-bold text-brand-600 dark:text-brand-400">{data.site.logoSize ?? 40}px</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setData({ ...data, site: { ...data.site, logoSize: Math.max(24, (data.site.logoSize ?? 40) - 4) } })}
+                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-sm font-bold transition hover:border-brand-500 hover:text-brand-600 dark:border-white/10"
+                >−</button>
+                <input
+                  type="range"
+                  min={24}
+                  max={80}
+                  step={4}
+                  value={data.site.logoSize ?? 40}
+                  onChange={(e) => setData({ ...data, site: { ...data.site, logoSize: Number(e.target.value) } })}
+                  className="flex-1 accent-brand-500"
+                />
+                <button
+                  onClick={() => setData({ ...data, site: { ...data.site, logoSize: Math.min(80, (data.site.logoSize ?? 40) + 4) } })}
+                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-sm font-bold transition hover:border-brand-500 hover:text-brand-600 dark:border-white/10"
+                >+</button>
+              </div>
+              <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                <span>24px (small)</span>
+                <span>80px (large)</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card title="Business Information" desc="Name, contact details, coverage — shown across the site.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div><label className={lbl}>Business Name</label><input className={inp} value={data.site.name} onChange={set("name")} /></div>
+          <div><label className={lbl}>Tagline</label><input className={inp} value={data.site.tagline} onChange={set("tagline")} /></div>
+          <div><label className={lbl}>Phone (display)</label><input className={inp} value={data.site.phone} onChange={set("phone")} /></div>
+          <div><label className={lbl}>WhatsApp Number</label><input className={inp} value={data.site.whatsappNumber} onChange={set("whatsappNumber")} /></div>
+          <div><label className={lbl}>Email</label><input className={inp} value={data.site.email} onChange={set("email")} /></div>
+          <div><label className={lbl}>Service Regions</label><input className={inp} value={data.site.regions} onChange={set("regions")} /></div>
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -454,38 +579,289 @@ function OfferTab({ data, setData }: P) {
 function HeroTab({ data, setData }: P) {
   const setHero = (patch: Partial<SiteData["hero"]>) => setData({ ...data, hero: { ...data.hero, ...patch } });
   const setPerk = (i: number, v: string) => { const perks = [...data.hero.perks]; perks[i] = v; setHero({ perks }); };
-  const [uploading, setUploading] = useState(false);
 
-  async function uploadHeroImage(file: File) {
-    setUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
+  const [editSrc, setEditSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [previewCropArea, setPreviewCropArea] = useState<Area | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [directUploading, setDirectUploading] = useState(false);
+  const [loadingEditor, setLoadingEditor] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const directUploadRef = useRef<HTMLInputElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cachedImgRef = useRef<HTMLImageElement | null>(null);
+  const croppedAreaPixelsRef = useRef<Area | null>(null);
+
+  // Pre-load editSrc into a cached HTMLImageElement for canvas drawing
+  useEffect(() => {
+    if (!editSrc) { cachedImgRef.current = null; return; }
+    const img = new window.Image();
+    img.onload = () => {
+      cachedImgRef.current = img;
+      // If onCropComplete already fired, draw now
+      if (previewCanvasRef.current && croppedAreaPixelsRef.current) {
+        drawPreview(img, croppedAreaPixelsRef.current);
+      }
+    };
+    img.src = editSrc;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editSrc]);
+
+  // Re-draw whenever crop area changes (fires when user drags/zooms)
+  useEffect(() => {
+    if (!previewCropArea || !cachedImgRef.current || !previewCanvasRef.current) return;
+    drawPreview(cachedImgRef.current, previewCropArea);
+  }, [previewCropArea]);
+
+  function drawPreview(img: HTMLImageElement, area: Area) {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, area.x, area.y, area.width, area.height, 0, 0, canvas.width, canvas.height);
+  }
+
+  const onCropComplete = useCallback((_: Area, pixels: Area) => {
+    croppedAreaPixelsRef.current = pixels;
+    setPreviewCropArea(pixels);
+  }, []);
+
+  function resetEditorState() {
+    croppedAreaPixelsRef.current = null;
+    cachedImgRef.current = null;
+    setPreviewCropArea(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+  }
+
+  function openEditor(file: File) {
+    if (editSrc && editSrc.startsWith("blob:")) URL.revokeObjectURL(editSrc);
+    resetEditorState();
+    setEditSrc(URL.createObjectURL(file));
+  }
+
+  async function openEditorUrl(url: string) {
+    setLoadingEditor(true);
+    if (editSrc && editSrc.startsWith("blob:")) URL.revokeObjectURL(editSrc);
+    resetEditorState();
+    setEditSrc(null);
     try {
-      const r = await fetch("/api/admin/upload", { method: "POST", body: fd });
-      const j = await r.json();
-      if (j.url) setHero({ heroImage: j.url });
-    } catch {} finally { setUploading(false); }
+      // Fetch as local blob so canvas can draw cross-origin images without taint
+      const res = await fetch(url);
+      const blob = await res.blob();
+      setEditSrc(URL.createObjectURL(blob));
+    } catch {
+      setEditSrc(url); // fallback: use URL directly
+    } finally {
+      setLoadingEditor(false);
+    }
+  }
+
+  function cancelEdit() {
+    if (editSrc && editSrc.startsWith("blob:")) URL.revokeObjectURL(editSrc);
+    setEditSrc(null);
+    resetEditorState();
+  }
+
+  async function uploadDirect(file: File) {
+    setDirectUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const uploadRes = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const uploadJson = await uploadRes.json();
+      if (!uploadJson.url) { alert(uploadJson.error || "Upload failed"); return; }
+      const newData = { ...data, hero: { ...data.hero, heroImage: uploadJson.url } };
+      setData(newData);
+      const saveRes = await fetch("/api/admin/site", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newData) });
+      if (!saveRes.ok) alert("Image uploaded but save failed — click Save manually.");
+    } catch (e) {
+      console.error(e);
+      alert("Upload failed. Try again.");
+    } finally {
+      setDirectUploading(false);
+      if (directUploadRef.current) directUploadRef.current.value = "";
+    }
+  }
+
+  async function cropAndUpload() {
+    if (!editSrc) return;
+    const pixels = croppedAreaPixelsRef.current;
+    if (!pixels) { alert("Please adjust the crop first, then try again."); return; }
+    setUploading(true);
+    try {
+      const blob = await getCroppedImg(editSrc, pixels);
+      const fd = new FormData();
+      fd.append("file", blob, "hero-image.jpg");
+      const uploadRes = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const uploadJson = await uploadRes.json();
+      if (!uploadJson.url) { alert(uploadJson.error || "Upload failed"); return; }
+      // Save updated URL into local state AND auto-persist to DB
+      const newData = { ...data, hero: { ...data.hero, heroImage: uploadJson.url } };
+      setData(newData);
+      cancelEdit();
+      const saveRes = await fetch("/api/admin/site", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newData) });
+      if (!saveRes.ok) alert("Image uploaded but save failed — click Save manually.");
+    } catch (e) {
+      console.error(e);
+      alert("Crop & upload failed. Try again.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
     <div className="space-y-5">
       <Card title="Hero Background Image" desc="Upload a high-quality car/road image for the hero section background.">
-        <div className="space-y-4">
-          {data.hero.heroImage && (
-            <div className="relative overflow-hidden rounded-xl">
-              <img src={data.hero.heroImage} alt="Hero background" className="h-48 w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <button onClick={() => setHero({ heroImage: "" })} className="absolute right-2 top-2 grid size-8 place-items-center rounded-full bg-red-500/90 text-white hover:bg-red-600"><Trash2 className="size-3.5" /></button>
-            </div>
-          )}
-          <div className="flex gap-3">
-            <label className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-900/15 py-4 text-sm font-bold transition hover:border-brand-500/50 hover:bg-brand-400/5 dark:border-white/10 ${uploading ? "pointer-events-none opacity-50" : ""}`}>
-              {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              {uploading ? "Uploading…" : "Upload Image"}
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadHeroImage(e.target.files[0])} />
-            </label>
+        {loadingEditor ? (
+          <div className="flex h-32 items-center justify-center gap-2 text-sm text-slate-500">
+            <Loader2 className="size-5 animate-spin" /> Loading image editor…
           </div>
-          <div><label className={lbl}>Or paste image URL</label><input className={inp} value={data.hero.heroImage ?? ""} onChange={(e) => setHero({ heroImage: e.target.value })} placeholder="https://images.unsplash.com/..." /></div>
+        ) : editSrc ? (
+          /* ── Image Editor Mode ── */
+          <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Crop panel */}
+              <div>
+                <p className={lbl + " mb-2"}>Drag to reposition · Scroll or use slider to zoom</p>
+                <div className="relative h-52 overflow-hidden rounded-xl bg-black">
+                  <EasyCropper
+                    image={editSrc}
+                    crop={crop}
+                    zoom={zoom}
+                    aspect={16 / 7}
+                    onCropChange={setCrop}
+                    onZoomChange={setZoom}
+                    onCropComplete={onCropComplete}
+                    classes={{ containerClassName: "rounded-xl" }}
+                  />
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <button onClick={() => setZoom((z) => Math.max(1, +(z - 0.1).toFixed(2)))} className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-900/15 text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"><ZoomOut className="size-3.5" /></button>
+                  <input type="range" min={1} max={3} step={0.02} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-slate-200 accent-brand-500 dark:bg-slate-700" />
+                  <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))} className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-900/15 text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"><ZoomIn className="size-3.5" /></button>
+                  <span className="w-10 text-right text-xs font-mono text-slate-500">{zoom.toFixed(1)}×</span>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={cancelEdit} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-900/12 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"><X className="size-3.5" /> Cancel</button>
+                  <button onClick={cropAndUpload} disabled={uploading} className="flex flex-[2] items-center justify-center gap-1.5 rounded-xl bg-brand-500 py-2.5 text-xs font-bold text-white hover:bg-brand-600 disabled:opacity-60">
+                    {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                    {uploading ? "Uploading…" : "Crop & Upload"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Live preview — canvas shows EXACT cropped region */}
+              <div>
+                <p className={lbl + " mb-2"}>Live Preview</p>
+                <div className="relative h-52 overflow-hidden rounded-xl bg-slate-900 shadow-lg">
+                  {/* Canvas renders the exact crop selection */}
+                  <canvas ref={previewCanvasRef} width={640} height={280} className="absolute inset-0 h-full w-full" />
+                  {!previewCropArea && (
+                    <div className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-500">Adjust the crop to see preview</div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 flex flex-col justify-center px-5 pt-3 pointer-events-none">
+                    <span className="mb-1.5 inline-flex w-fit items-center gap-1 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-yellow-300">
+                      <span className="size-1.5 rounded-full bg-yellow-400" /> {data.site.tagline || "One Way Taxi"}
+                    </span>
+                    <p className="font-bold text-white leading-snug" style={{ fontSize: "clamp(12px,2.2vw,18px)" }}>
+                      {data.hero.headline.replace(/\*([^*]+)\*/g, "$1") || "Book Your Taxi"}
+                    </p>
+                    <p className="mt-1 text-[10px] text-slate-300 leading-relaxed line-clamp-2">{data.hero.description || "Fast, reliable outstation taxi service."}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {data.hero.perks.slice(0, 3).map((p) => (
+                        <span key={p} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[9px] font-semibold text-white/85">{p}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="absolute bottom-3 right-3 w-28 rounded-xl border border-white/10 bg-white/10 px-2.5 py-2 backdrop-blur-sm pointer-events-none">
+                    <p className="text-[8px] font-bold text-white mb-1">Quick Booking</p>
+                    <div className="space-y-1">
+                      <div className="h-2.5 w-full rounded bg-white/20" />
+                      <div className="h-2.5 w-full rounded bg-white/20" />
+                      <div className="mt-1.5 h-3 w-full rounded bg-green-500/80 text-center text-[7px] font-bold text-white leading-3">Book Now</div>
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-1.5 text-[10px] text-slate-500">Preview updates as you adjust the crop.</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ── Normal Mode ── */
+          <div className="space-y-4">
+            {data.hero.heroImage && (
+              <div className="relative overflow-hidden rounded-xl">
+                <img src={data.hero.heroImage} alt="Hero background" className="h-48 w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-3 left-3">
+                  <span className="rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">Current hero image</span>
+                </div>
+                <div className="absolute right-2 top-2 flex gap-1.5">
+                  <button onClick={() => openEditorUrl(data.hero.heroImage!)} className="flex items-center gap-1.5 rounded-full bg-brand-500/90 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-brand-600">
+                    <Crop className="size-3" /> Edit & Crop
+                  </button>
+                  <button onClick={() => setHero({ heroImage: "" })} className="grid size-7 place-items-center rounded-full bg-red-500/90 text-white hover:bg-red-600"><Trash2 className="size-3" /></button>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-900/15 py-4 text-center text-sm font-bold transition hover:border-brand-500/50 hover:bg-brand-400/5 dark:border-white/10">
+                <Upload className="size-4" />
+                <span>{data.hero.heroImage ? "Replace" : "Upload"} + Crop</span>
+                <span className="text-[10px] font-normal text-slate-400">Opens editor</span>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { e.target.files?.[0] && openEditor(e.target.files[0]); e.target.value = ""; }} />
+              </label>
+              <label className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-900/15 py-4 text-center text-sm font-bold transition hover:border-brand-500/50 hover:bg-brand-400/5 dark:border-white/10 ${directUploading ? "pointer-events-none opacity-60" : ""}`}>
+                {directUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                <span>{directUploading ? "Uploading…" : (data.hero.heroImage ? "Replace" : "Upload")}</span>
+                <span className="text-[10px] font-normal text-slate-400">No crop</span>
+                <input ref={directUploadRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDirect(f); }} />
+              </label>
+            </div>
+            <div><label className={lbl}>Or paste image URL</label><input className={inp} value={data.hero.heroImage ?? ""} onChange={(e) => setHero({ heroImage: e.target.value })} placeholder="https://images.unsplash.com/..." /></div>
+          </div>
+        )}
+      </Card>
+      <Card title="Background Display Mode" desc="How the hero background image is sized on the site.">
+        <div className="grid grid-cols-2 gap-3">
+          {(["screen", "content"] as const).map((mode) => {
+            const active = (data.hero.heroImageFit ?? "screen") === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => setHero({ heroImageFit: mode })}
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-left transition ${active ? "border-brand-500 bg-brand-400/10" : "border-slate-200 hover:border-brand-400/50 dark:border-white/10"}`}
+              >
+                <div className={`w-full rounded-lg overflow-hidden border ${active ? "border-brand-400/50" : "border-slate-200 dark:border-white/10"}`} style={{ height: 56 }}>
+                  {mode === "screen" ? (
+                    <div className="h-full w-full bg-slate-700 flex items-center justify-center">
+                      <div className="w-full h-full bg-gradient-to-br from-slate-500 to-slate-800 flex items-end pb-1 pl-1">
+                        <div className="text-[6px] text-white/60 font-bold">FILLS SCREEN</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full w-full bg-slate-900 flex flex-col">
+                      <div className="flex-1 bg-gradient-to-br from-slate-500 to-slate-700" style={{ maxHeight: 30 }} />
+                      <div className="flex-1 bg-slate-900" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className={`text-xs font-bold ${active ? "text-brand-600 dark:text-brand-400" : ""}`}>
+                    {mode === "screen" ? "Fill Screen" : "Fit to Content"}
+                  </p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {mode === "screen" ? "Image covers full viewport height" : "Full image shown at top, no cropping"}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </Card>
       <Card title="Hero Content" desc="*word* = shimmer highlight.">
@@ -921,6 +1297,115 @@ function ToursTab({ data, setData }: P) {
         </section>
       ))}
       <button onClick={() => setT({ items: [...data.tours.items, { title: "New Tour", image: "", duration: "1 Day", price: "₹2,999", nonAcPrice: "₹2,599", includesCar: true, description: "Tour description", highlights: [], inclusions: [] }] })} className="glass flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold text-brand-600 hover:border-brand-500/50 dark:text-brand-400"><Plus className="size-4" /> Add Tour Package</button>
+    </div>
+  );
+}
+
+const DEST_TYPES = ["city", "temple", "hill", "coastal", "business", "scenic"];
+
+function DestinationsTab({ data, setData }: P) {
+  const setHead = (patch: Partial<SiteData["destinationsHead"]>) =>
+    setData({ ...data, destinationsHead: { ...data.destinationsHead, ...patch } });
+  const update = (i: number, patch: Partial<DestinationItem>) =>
+    setData({ ...data, destinations: data.destinations.map((d, j) => (j === i ? { ...d, ...patch } : d)) });
+  const fileRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const [uploading, setUploading] = useState<number | null>(null);
+
+  async function upload(i: number, file: File) {
+    setUploading(i);
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const j = await res.json();
+      if (j.url) {
+        const newDestinations = data.destinations.map((dest, idx) =>
+          idx === i ? { ...dest, image: j.url } : dest
+        );
+        const newData = { ...data, destinations: newDestinations };
+        setData(newData);
+        const saveRes = await fetch("/api/admin/site", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newData),
+        });
+        if (!saveRes.ok) alert("Image uploaded but save failed — click Save manually.");
+      } else {
+        alert(j.error || "Upload failed");
+      }
+    } catch { alert("Upload failed"); } finally { setUploading(null); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card title="Section Heading">
+        <HeadingEditor heading={data.destinationsHead} onChange={setHead} />
+      </Card>
+
+      <Card title="Cards Per Row" desc="Choose how many destination cards appear side-by-side.">
+        <div className="flex gap-3">
+          {([1, 2] as const).map((col) => {
+            const active = (data.destinationsColumns ?? 2) === col;
+            return (
+              <button
+                key={col}
+                onClick={() => setData({ ...data, destinationsColumns: col })}
+                className={`flex flex-1 flex-col items-center gap-2 rounded-xl border-2 py-4 transition ${active ? "border-brand-500 bg-brand-400/10" : "border-slate-200 hover:border-brand-400/50 dark:border-white/10"}`}
+              >
+                <div className={`flex gap-1 ${active ? "opacity-100" : "opacity-50"}`}>
+                  {Array.from({ length: col }).map((_, j) => (
+                    <div key={j} className="h-10 w-12 rounded-md bg-slate-300 dark:bg-slate-600" />
+                  ))}
+                </div>
+                <span className={`text-xs font-bold ${active ? "text-brand-600 dark:text-brand-400" : ""}`}>
+                  {col === 1 ? "1 per row — Full width" : "2 per row — Side by side"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {data.destinations.map((dest, i) => (
+        <section key={i} className="glass flex items-start gap-4 rounded-2xl p-4 sm:p-5">
+          {/* Image preview + upload */}
+          <div className="w-28 shrink-0">
+            <div className="relative h-20 w-28 overflow-hidden rounded-xl bg-slate-900/5 dark:bg-white/5">
+              {dest.image
+                ? <img src={dest.image} alt={dest.name} className="h-full w-full object-cover" />
+                : <span className="grid h-full place-items-center text-[10px] text-slate-400">No image</span>}
+            </div>
+            <input ref={(el) => { fileRefs.current[i] = el; }} type="file" accept="image/*" className="hidden"
+              onChange={(e) => e.target.files?.[0] && upload(i, e.target.files[0])} />
+            <button onClick={() => fileRefs.current[i]?.click()} disabled={uploading === i}
+              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-brand-500/40 py-1.5 text-[11px] font-bold text-brand-600 hover:bg-brand-400/10 dark:text-brand-400">
+              {uploading === i ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
+              {uploading === i ? "..." : "Upload"}
+            </button>
+          </div>
+
+          {/* Fields */}
+          <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
+            <div><label className={lbl}>City Name</label><input className={inp} value={dest.name} onChange={(e) => update(i, { name: e.target.value })} /></div>
+            <div><label className={lbl}>Subtitle</label><input className={inp} value={dest.subtitle} onChange={(e) => update(i, { subtitle: e.target.value })} /></div>
+            <div>
+              <label className={lbl}>Type (badge)</label>
+              <select className={inp} value={dest.type} onChange={(e) => update(i, { type: e.target.value })}>
+                {DEST_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Image URL</label><input className={inp} value={dest.image} onChange={(e) => update(i, { image: e.target.value })} placeholder="https://..." /></div>
+          </div>
+
+          <button onClick={() => setData({ ...data, destinations: data.destinations.filter((_, j) => j !== i) })}
+            className="mt-5 shrink-0 rounded-lg p-2 text-red-500 hover:bg-red-500/10"><Trash2 className="size-3.5" /></button>
+        </section>
+      ))}
+
+      <button
+        onClick={() => setData({ ...data, destinations: [...data.destinations, { name: "New City", subtitle: "City travel", type: "city", image: "" }] })}
+        className="glass flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold text-brand-600 hover:border-brand-500/50 dark:text-brand-400">
+        <Plus className="size-4" /> Add Destination
+      </button>
     </div>
   );
 }

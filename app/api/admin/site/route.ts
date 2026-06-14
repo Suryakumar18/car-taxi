@@ -52,6 +52,9 @@ export async function PUT(request: Request) {
     offer: { ...DEFAULT_DATA.offer, ...body.offer },
     tours: { ...DEFAULT_DATA.tours, ...body.tours, items: body.tours?.items ?? DEFAULT_DATA.tours.items },
     customThemes: Array.isArray(body.customThemes) ? body.customThemes : DEFAULT_DATA.customThemes,
+    destinationsHead: { ...DEFAULT_DATA.destinationsHead, ...body.destinationsHead },
+    destinations: Array.isArray(body.destinations) ? body.destinations : DEFAULT_DATA.destinations,
+    destinationsColumns: (body.destinationsColumns === 1 || body.destinationsColumns === 2) ? body.destinationsColumns : DEFAULT_DATA.destinationsColumns,
   };
 
   // numeric coercion + cleanup
@@ -90,6 +93,10 @@ export async function PUT(request: Request) {
     description: String(t.description || ""),
     highlights: Array.isArray(t.highlights) ? t.highlights.map(String).filter(Boolean) : [],
     inclusions: Array.isArray(t.inclusions) ? t.inclusions.map(String).filter(Boolean) : [],
+  }));
+  data.destinations = (data.destinations || []).filter((d) => d.name).map((d) => ({
+    name: String(d.name), subtitle: String(d.subtitle || ""),
+    type: String(d.type || "city"), image: String(d.image || ""),
   }));
   data.customThemes = (data.customThemes || []).filter((t) => t.label).map((t) => ({
     label: String(t.label), colors: {

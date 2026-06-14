@@ -7,6 +7,8 @@ export type SiteInfo = {
   whatsappNumber: string;
   email: string;
   regions: string;
+  logoUrl?: string;
+  logoSize?: number;
 };
 
 export type NavLink = { label: string; href: string };
@@ -60,6 +62,7 @@ export type HeroContent = {
   description: string;
   perks: string[];
   heroImage: string;
+  heroImageFit?: "screen" | "content";
 };
 
 export type StatItem = { value: number; suffix: string; label: string; decimals?: number };
@@ -103,6 +106,13 @@ export type TourPackage = {
   inclusions: string[];
 };
 
+export type DestinationItem = {
+  name: string;
+  subtitle: string;
+  type: string; // city | temple | hill | coastal | business | scenic
+  image: string;
+};
+
 export type SiteData = {
   site: SiteInfo;
   navLinks: NavLink[];
@@ -136,6 +146,9 @@ export type SiteData = {
   offer: OfferPopup;
   tours: SectionHeading & { items: TourPackage[] };
   customThemes: ThemePreset[];
+  destinationsHead: SectionHeading;
+  destinations: DestinationItem[];
+  destinationsColumns: 1 | 2;
 };
 
 export type ThemePreset = {

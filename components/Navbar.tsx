@@ -7,7 +7,6 @@ import { motion } from "framer-motion";
 import { CarTaxiFront, Phone, MessageCircle, Menu, X } from "lucide-react";
 import { useSite } from "./SiteProvider";
 import ThemeToggle from "./ThemeToggle";
-import ThemePicker from "./ThemePicker";
 
 export default function Navbar() {
   const { site, navLinks, phoneHref, wa, quickMessage, hero } = useSite();
@@ -56,13 +55,27 @@ export default function Navbar() {
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         <a href="#" className="flex items-center gap-2">
-          <span className="grid size-10 place-items-center rounded-xl bg-brand-400 text-slate-950 glow-brand">
-            <CarTaxiFront className="size-6" />
-          </span>
-          <span className={`font-display text-lg font-bold tracking-tight ${overHeroImage ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.4)]" : ""}`}>
-            {words[0]}
-            {words.length > 1 && <span className="text-brand-500 dark:text-brand-400"> {words.slice(1).join(" ")}</span>}
-          </span>
+          {site.logoUrl ? (
+            /* Fixed-height wrapper keeps nav layout height constant regardless of logo size */
+            <div className="flex h-10 items-center mt-2" style={{ overflow: "visible" }}>
+              <img
+                src={site.logoUrl}
+                alt={site.name}
+                className="w-auto object-contain"
+                style={{ height: `${site.logoSize ?? 80}px` }}
+              />
+            </div>
+          ) : (
+            <>
+              <span className="grid size-10 place-items-center rounded-xl bg-brand-400 text-slate-950 glow-brand">
+                <CarTaxiFront className="size-6" />
+              </span>
+              <span className={`font-display text-lg font-bold tracking-tight ${overHeroImage ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.4)]" : ""}`}>
+                {words[0]}
+                {words.length > 1 && <span className="text-brand-500 dark:text-brand-400"> {words.slice(1).join(" ")}</span>}
+              </span>
+            </>
+          )}
         </a>
 
         <ul className="hidden items-center gap-7 text-sm font-medium lg:flex">
@@ -79,7 +92,6 @@ export default function Navbar() {
         </ul>
 
         <div className="hidden items-center gap-2 sm:flex">
-          <ThemePicker />
           <ThemeToggle />
           <a
             href={phoneHref}
@@ -98,7 +110,6 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 sm:hidden">
-          <ThemePicker />
           <ThemeToggle />
           <button
             onClick={() => setOpen(!open)}

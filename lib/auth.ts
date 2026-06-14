@@ -3,15 +3,12 @@ import { cookies } from "next/headers";
 
 const COOKIE = "admin_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
-
-function secret(): string {
-  const s = process.env.AUTH_SECRET;
-  if (!s) throw new Error("AUTH_SECRET is not set in .env.local");
-  return s;
-}
+const AUTH_SECRET = "f1ad79793fce18a300ef58e8709d72014726d5008df5896c";
+const ADMIN_USERNAME = "admin";
+const ADMIN_PASSWORD = "Nagma@2026";
 
 function sign(payload: string): string {
-  return createHmac("sha256", secret()).update(payload).digest("base64url");
+  return createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
 }
 
 export function createToken(): string {
@@ -34,9 +31,7 @@ export function verifyToken(token: string | undefined): boolean {
 }
 
 export function checkCredentials(username: string, password: string): boolean {
-  const u = process.env.ADMIN_USERNAME;
-  const p = process.env.ADMIN_PASSWORD;
-  return Boolean(u && p && username === u && password === p);
+  return username === ADMIN_USERNAME && password === ADMIN_PASSWORD;
 }
 
 export async function isAdminRequest(): Promise<boolean> {
@@ -49,7 +44,7 @@ export async function setSessionCookie(): Promise<void> {
   store.set(COOKIE, createToken(), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: false,
     maxAge: MAX_AGE,
     path: "/",
   });
